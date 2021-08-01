@@ -18,8 +18,8 @@ app.use(bodyParser.json())
 
 // middlewares
 const auth = function (req, res, next) {
-	if (!req.headers.authorization) return res.status(403).json({ error: 'No credentials sent!' })
-	else if (req.headers.authorization !== process.env.AUTH) return res.status(403).json({ error: 'Incorrect credentials sent!' })
+	if (!req.headers.authorization) return res.status(401).json({ error: 'No credentials sent' })
+	else if (req.headers.authorization !== process.env.AUTH) return res.status(403).json({ error: 'Incorrect credentials sent' })
 	next()
 }
 
