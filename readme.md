@@ -67,6 +67,36 @@ node app.js
 
 `500` Internal error
 
+## Set Active Stream
+
+**URL** `/setactivestream`
+
+**METHOD** `POST`
+
+**HEADER** `Authorization: passowrd`
+
+**Body**
+
+```jsx
+{
+  "_id": "5lieE8sc1hB5kTip"
+}
+```
+
+**Success Response**
+
+\***\*`200` \*\*** Active stream set
+
+**Error Response**
+
+`400` No stream id given
+
+`401` No credentials sent
+
+`403` Incorrect credentials
+
+`500` Internal error
+
 ## Create Stream
 
 **URL** `/createstream`
