@@ -3,9 +3,7 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const bodyParser = require('body-parser')
-const Datastore = require('nedb')
-
-const db = new Datastore({ filename: './data.json', autoload: true })
+const pool = require('./db')
 
 // Active stream ID
 let activeStreamId = null
@@ -24,76 +22,86 @@ const auth = function (req, res, next) {
 }
 
 // Routes
-app.get('/allstreams', (req, res) => {
-	db.find({}, (err, docs) => {
-		if (err) res.status(500).send('Internal error')
-		else res.json(docs)
-	})
+app.get('/allstreams', async (req, res) => {
+	try {
+		const result = await pool.query('SELECT * FROM streams')
+		res.json(result.rows)
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
+	}
 })
 
-app.get('/streamurl', (req, res) => {
-	db.findOne({ _id: activeStreamId }, (err, doc) => {
-		if (err) res.status(500).send('Internal error')
-		else res.json(doc)
-	})
+app.get('/streamurl', async (req, res) => {
+	try {
+		if (activeStreamId) {
+			const result = await pool.query('SELECT * FROM streams WHERE _id = $1', [activeStreamId])
+			res.json(result.rows[0])
+		} else res.json(null)
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
+	}
 })
 
 app.use('/setactivestream', auth)
-app.post('/setactivestream', (req, res) => {
-	if (!req.body._id) res.status(400).send('No stream id given')
-	else {
+app.post('/setactivestream', async (req, res) => {
+	try {
+		if (!req.body._id) res.status(400).send('No stream id given')
+		else await pool.query('UPDATE "activeStream" SET "streamId"=$1 WHERE _id=1', [req.body._id])
 		activeStreamId = req.body._id
 		res.send('Active stream set')
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
 	}
 })
 
 app.use('/createstream', auth)
-app.post('/createstream', (req, res) => {
-	db.insert(
-		{
-			streamName: String(req.body.streamName || ''),
-			mediaLink: String(req.body.mediaLink || ''),
-			infoLink: String(req.body.infoLink || ''),
-		},
-		(err, newDoc) => {
-			if (err) res.status(500).send('Internal error')
-			else res.json(newDoc)
-		}
-	)
+app.post('/createstream', async (req, res) => {
+	try {
+		let data = [String(req.body.streamName || ''), String(req.body.mediaLink || ''), String(req.body.infoLink || '')]
+		const result = await pool.query('INSERT INTO streams ("mediaLink", "infoLink", "streamName") VALUES  ($1, $2, $3) RETURNING *', data)
+		res.json(result.rows[0])
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
+	}
 })
 
 app.use('/updatestream', auth)
-app.post('/updatestream', (req, res) => {
-	if (!req.body._id) res.status(400).send('No stream id given')
-	db.update(
-		{ _id: req.body._id },
-		{
-			streamName: String(req.body.streamName || ''),
-			mediaLink: String(req.body.mediaLink || ''),
-			infoLink: String(req.body.infoLink || ''),
-		},
-		{ returnUpdatedDocs: true, multi: false },
-		function (err, numReplaced, doc) {
-			if (err) res.status(500).send('Internal error')
-			else if (numReplaced > 0) res.status(200).json(doc)
+app.post('/updatestream', async (req, res) => {
+	try {
+		if (!req.body._id) res.status(400).send('No stream id given')
+		else {
+			let data = [String(req.body.streamName || ''), String(req.body.mediaLink || ''), String(req.body.infoLink || ''), req.body._id]
+			const result = await pool.query('UPDATE streams SET "streamName" = $1, "mediaLink" = $2, "infoLink" = $3 WHERE _id=$4 RETURNING *', data)
+			if (result.rowCount > 0) res.json(result.rows[0])
 			else res.status(404).send('Stream not found')
 		}
-	)
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
+	}
 })
 
 app.use('/deletestream', auth)
-app.post('/deletestream', (req, res) => {
-	if (!req.body._id) res.status(400).send('No stream id given')
-	else {
-		db.remove({ _id: req.body._id }, {}, function (err, numRemoved) {
-			if (err) res.status(500).send('Internal error')
-			else if (numRemoved > 0) res.status(200).json('Stream deleted')
-			else res.status(404).send('Stream not found')
-		})
+app.post('/deletestream', async (req, res) => {
+	try {
+		if (!req.body._id) res.status(400).send('No stream id given')
+		const result = await pool.query('DELETE FROM streams WHERE _id=$1', [req.body._id])
+		if (result.rowCount > 0) res.status(200).json('Stream deleted')
+		else res.status(404).send('Stream not found')
+	} catch (err) {
+		console.log(err)
+		res.status(500).send('Internal error')
 	}
 })
 
 // Starting server
-app.listen(port, () => {
+app.listen(port, async () => {
+	const result = await pool.query('SELECT * FROM "activeStream" WHERE _id=1')
+	activeStreamId = result.rows[0].streamId
+	console.log('Active streamId', activeStreamId)
 	console.log(`RR server listening at http://localhost:${port}`)
 })
