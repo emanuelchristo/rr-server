@@ -9,6 +9,28 @@ npm install
 node app.js
 ```
 
+## SQL Tables
+
+### streams
+
+**Schema**
+
+\_id `bigserial`
+
+mediaLink `varchar`
+
+infoLink `varchar`
+
+streamName `varchar`
+
+### activeStream
+
+**schema**
+
+\_id `bigint` // value set to 1
+
+streamId `varchar`
+
 # API Documentation
 
 ## All Streams
